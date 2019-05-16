@@ -1,0 +1,28 @@
+A constant-time implementation of BLISS-I
+
+Companion code to the submission "GALACTICS: Gaussian Sampling for
+Lattice-Based Constant-Time Implementation of Cryptographic Signatures,
+Revisited".
+
+This implementation is written for the SUPERCOP testing framework.
+To test it, download supercop from:
+
+   https://bench.cr.yp.to/supercop/supercop-20190110.tar.xz
+
+and untar the archive. Then set okcompilers/c appropriately, and compile
+the required libraries using
+
+   ./do-part used
+
+Finally, place this directory (bliss1_galactics) into the crypto_sign
+subdirectory, and run:
+
+   ./do-part crypto_sign bliss1_galactics
+
+to launch the measurement process. See also:
+
+   https://bench.cr.yp.to/tips.html
+   https://bench.cr.yp.to/call-sign.html
+
+for details.
+

@@ -1,0 +1,28 @@
+This artifact demonstrates the descent attack.
+
+ - Requirements:
+    - python3    (>=3.7.3)
+    - sage       (>= 8.5)
+    - Tensorflow (>=1.13.0)
+
+- How to:
+    (1) Genere the desired number of samples with sage genere.py
+        [NB_OF_SAMPLES].
+
+    (2) Launch the attack with python3 postTreatment.py
+        [NAME_OF_THE_FILE_PRODUCED_BY (1)] [THRESHOLD_FOR_LOCALIZATION]
+
+- Test case (with optimized parameters)
+    sage genere.py 300000 && python3 postTreatment.py spc_guess_4_300000
+    0.4
+
+
+# NOTES
+- You can change the version of BLISS to attack by modifying the
+Flag BLISS in the header of the file BLISS.sage.
+
+- Hyperparameters  of the descent can be tailored by changing the values
+the lists B, EPS, MAXMOU in the file postTreatment.py.
+
+- The number of steps in the descent can be adapted by modifying the
+variable LIM. ( please set LIM_NORM around LIM/2)

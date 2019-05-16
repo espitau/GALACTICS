@@ -1,0 +1,340 @@
+#include <inttypes.h>
+#include <string.h>
+#include "randombytes.h"
+#include "bliss.h"
+#include "gaussian_sampling.h"
+#include "rej_sampling.h"
+#include <x86intrin.h>
+
+#define sample_gaussian_poly_bern sample_gaussian_poly 
+
+#if TIMEIT
+#include <stdio.h>
+unsigned long long cycles;
+#define start_time(x) do { printf("Start counting cycles for " x "\n"); \
+    			cycles = __rdtsc(); } while(0)
+#define stop_time(x) do { cycles = __rdtsc() - cycles; \
+    			printf("Total cycles for " x ": %llu\n", cycles); \
+			} while(0)
+#else
+#define start_time(x)
+#define stop_time(x)
+#endif
+
+uint32_t sample_berncdt(uint64_t utop, uint64_t ubot)
+{
+    uint32_t x = 0;
+    uint32_t b = 1;
+    uint32_t r, s, t;
+
+    t  = (utop >  11881272476311950404ULL);
+    r  = (utop == 11881272476311950404ULL);
+    s  = (ubot >   2232598800125794762ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  17729174351313943813ULL);
+    r  = (utop == 17729174351313943813ULL);
+    s  = (ubot >  17046599807202850264ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  18426461144592799266ULL);
+    r  = (utop == 18426461144592799266ULL);
+    s  = (ubot >   9031501729263515114ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  18446602887327906610ULL);
+    r  = (utop == 18446602887327906610ULL);
+    s  = (ubot >  11817852927693963396ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  18446743834670245612ULL);
+    r  = (utop == 18446743834670245612ULL);
+    s  = (ubot >   7306021935394802834ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  18446744073611412414ULL);
+    r  = (utop == 18446744073611412414ULL);
+    s  = (ubot >  17880792342251759005ULL);
+    b  = (r && s) || t;
+    x += b;
+    t  = (utop >  18446744073709541852ULL);
+    r  = (utop == 18446744073709541852ULL);
+    s  = (ubot >  14689009182029885173ULL);
+    b  = (r && s) || t;
+    x += b;
+    r  = (utop == 18446744073709551615ULL);
+    s  = (ubot >  14106032229701791861ULL);
+    b  = (r && s);
+    x += b;
+    s  = (ubot >  18446718728838181855ULL);
+    b &= s;
+    x += b;
+    s  = (ubot >  18446744073673701140ULL);
+    b &= s;
+    x += b;
+    
+    return x;
+}
+__m256i sample_berncdt4(__m256i utop, __m256i ubot)
+{
+    __m256i x = _mm256_setzero_si256();
+    __m256i b, r, s, t;
+
+    /* Note: we want *unsigned* comparisons, but AVX2 only supports
+     * signed comparisons. We therefore emulate unsigned comparisons by
+     * signed comparisons between values with their top bit flipped. See
+     *
+     * https://stackoverflow.com/a/24171383
+     *
+     * Since utop, ubot are supposed to be uniformly random, we can
+     * simply assume that they represent the correct values with top bit
+     * flipped already, so we only flip the sign bits of the constants.
+     */
+
+#define _mm256_cmpgtconst_epu64(x,c) (_mm256_cmpgt_epi64((x),_mm256_set1_epi64x((c)^0x8000000000000000ULL)))
+#define _mm256_cmpeqconst_epu64(x,c) (_mm256_cmpeq_epi64((x),_mm256_set1_epi64x((c)^0x8000000000000000ULL)))
+
+    t = _mm256_cmpgtconst_epu64(utop, 11881272476311950404ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 11881272476311950404ULL);
+    s = _mm256_cmpgtconst_epu64(ubot,  2232598800125794762ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 17729174351313943813ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 17729174351313943813ULL);
+    s = _mm256_cmpgtconst_epu64(ubot, 17046599807202850264ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18426461144592799266ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 18426461144592799266ULL);
+    s = _mm256_cmpgtconst_epu64(ubot,  9031501729263515114ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446602887327906610ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 18446602887327906610ULL);
+    s = _mm256_cmpgtconst_epu64(ubot, 11817852927693963396ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446743834670245612ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 18446743834670245612ULL);
+    s = _mm256_cmpgtconst_epu64(ubot,  7306021935394802834ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446744073611412414ULL);
+    r = _mm256_cmpeqconst_epu64(utop, 18446744073611412414ULL);
+    s = _mm256_cmpgtconst_epu64(ubot, 17880792342251759005ULL);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446744073709541852ull);
+    r = _mm256_cmpeqconst_epu64(utop, 18446744073709541852ull);
+    s = _mm256_cmpgtconst_epu64(ubot, 14689009182029885173ull);
+    b = _mm256_or_si256(_mm256_and_si256(r,s),t);
+    x = _mm256_sub_epi64(x,b);
+
+    r = _mm256_cmpeqconst_epu64(utop, 18446744073709551615ULL);
+    s = _mm256_cmpgtconst_epu64(ubot, 14106032229701791861ULL);
+    b = _mm256_and_si256(r,s);
+    x = _mm256_sub_epi64(x,b);
+
+    s = _mm256_cmpgtconst_epu64(ubot, 18446718728838181855ULL);
+    b = _mm256_and_si256(b,s);
+    x = _mm256_sub_epi64(x,b);
+
+    s = _mm256_cmpgtconst_epu64(ubot, 18446744073673701140ULL);
+    b = _mm256_and_si256(b,s);
+    x = _mm256_sub_epi64(x,b);
+    
+    return x;
+}
+
+__m256i sample_berncdt4_64(__m256i utop)
+{
+    __m256i x = _mm256_setzero_si256(), t;
+
+    t = _mm256_cmpgtconst_epu64(utop, 11881272476311950404ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 17729174351313943813ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18426461144592799266ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446602887327906610ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446743834670245612ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446744073611412414ULL);
+    x = _mm256_sub_epi64(x,t);
+
+    t = _mm256_cmpgtconst_epu64(utop, 18446744073709541852ull);
+    x = _mm256_sub_epi64(x,t);
+
+    return x;
+}
+
+static inline __m256i mul32x64(__m256i a, __m256i b) {
+    return _mm256_add_epi64(
+	    _mm256_mul_epu32(a, _mm256_and_si256(b, 
+		    _mm256_set1_epi64x(0x00000000FFFFFFFF))),
+	    _mm256_shuffle_epi32(
+		_mm256_mul_epu32(a, _mm256_srli_epi64(b, 32)), 0xB1));
+}
+
+__m256i exp_scaled4(__m256i x)
+{
+    __m256i r = _mm256_setzero_si256();
+
+#define hornerstep(c,r,x,s) _mm256_srli_epi64(mul32x64((x),_mm256_sub_epi64(_mm256_set1_epi64x(c),(r))),(s))
+    r = hornerstep( 809438661408LL, r, x, 28);
+    r = hornerstep( 869506949331LL, r, x, 28);
+    r = hornerstep( 640044208952LL, r, x, 27);
+    r = hornerstep( 793458686015LL, r, x, 27);
+    r = hornerstep( 839743192604LL, r, x, 27);
+    r = hornerstep( 740389683060LL, r, x, 26);
+    r = hornerstep(1044449863563LL, r, x, 27);
+    r = hornerstep( 552517269260LL, r, x, 25);
+    r = hornerstep( 779422325990LL, r, x, 23);
+
+    return _mm256_sub_epi64(_mm256_set1_epi64x(2199023255552LL), r);
+}
+
+
+#define BERN_RANDMULT	416
+
+void sample_gaussian_poly_bern(polysmall_t *p1, polysmall_t *p2) 
+{
+    size_t i = 0, pos = 0;
+    __m256i x, y, t, k, z, c, utop, ubot, v, w, *us;
+
+    unsigned char *cs;
+    unsigned char buf[(5 + 3*4*sizeof(uint64_t))*BERN_RANDMULT]
+	__attribute__ ((aligned(32)));
+
+    uint32_t coeffs[2*N+4];
+
+    //start_time("randombytes");
+    randombytes(buf, sizeof buf);
+    //stop_time("randombytes");
+
+    us = (__m256i*) buf;
+    cs = buf + 3*4*sizeof(uint64_t)*BERN_RANDMULT;
+
+    //start_time("sample_berncdt");
+    while(i<2*N) {
+	if(pos++ >= BERN_RANDMULT) {
+	    randombytes(buf, sizeof buf);
+	    pos = 0;
+	    us = (__m256i*) buf;
+	    cs = buf + 3*4*sizeof(uint64_t)*BERN_RANDMULT;
+	    printf("Randomness overflow!\n");
+	}
+
+	utop = _mm256_stream_load_si256(us++);
+	ubot = _mm256_stream_load_si256(us++);
+	w    = _mm256_stream_load_si256(us++);
+	w    = _mm256_or_si256(w, _mm256_set1_epi64x(0x8000000000000000));
+
+	x    = sample_berncdt4(utop, ubot);
+
+	/*
+	unsigned long long x0 = _mm256_extract_epi64(x,3),
+		  utop0 = _mm256_extract_epi64(utop,3) ^ 0x8000000000000000,
+		  ubot0 = _mm256_extract_epi64(ubot,3) ^ 0x8000000000000000;
+	printf("sample_berncdt4(u)[3] = %llu; sample_berncdt(u3) = %llu: %s\n",
+		x0, sample_berncdt(utop0,ubot0), 
+		x0==sample_berncdt(utop0,ubot0)?"ok":"WRONG");
+	*/
+	
+	x    = _mm256_slli_epi64(x, 8);
+	y    = _mm256_set_epi64x(cs[0], cs[1], cs[2], cs[3]);
+	cs  += 4;
+	z    = _mm256_add_epi64(x, y);
+	y    = _mm256_slli_epi64(_mm256_mul_epu32(y,
+		    _mm256_add_epi64(x, z)), 8);
+
+	/*
+	unsigned long long y0 = _mm256_extract_epi64(y,0);
+
+	printf("%lld %lld %lld %lld\n", 
+		_mm256_extract_epi64(z,0), _mm256_extract_epi64(z,1),
+	       	_mm256_extract_epi64(z,2), _mm256_extract_epi64(z,3));
+	*/
+
+	k    = _mm256_srli_epi64(_mm256_mul_epu32(y,
+		    _mm256_set1_epi64x(97488647)), 32);
+	k    = _mm256_srli_epi64(_mm256_add_epi64(k, 
+		    _mm256_srli_epi64(_mm256_sub_epi64(y, k), 1)), 23);
+	t    = _mm256_sub_epi64(y, _mm256_mul_epu32(k, 
+		    _mm256_set1_epi64x(16404853)));
+
+	/*
+	unsigned long long t0 = _mm256_extract_epi64(t,0);
+	printf("%llu mod 16404853 =? %llu (%s%c)\n", y0, t0, 
+		(t0==(y0%16404853))?"true":"FALSE", (y0>=16404853)?'!':'.');
+	*/
+
+	v    = exp_scaled4(t);
+
+	/* 
+	unsigned long long v0 = _mm256_extract_epi64(v,0),
+		      t0 = _mm256_extract_epi64(t,0);
+	printf("exp_scaled4(t)[0] = %llu; exp_scaled(t0) = %llu: %s\n",
+		v0, exp_scaled(t0), v0==exp_scaled(t0)?"ok":"WRONG");
+	*/
+	
+	/*
+	v    = _mm256_set_epi64x(
+		exp_scaled(_mm256_extract_epi64(t,3)),
+		exp_scaled(_mm256_extract_epi64(t,2)),
+		exp_scaled(_mm256_extract_epi64(t,1)),
+		exp_scaled(_mm256_extract_epi64(t,0)));
+	*/
+
+	v    = _mm256_sllv_epi64(v, _mm256_sub_epi64(
+		    _mm256_set1_epi64x(22), k));
+
+	v    = _mm256_xor_si256(v, _mm256_set1_epi64x(0x8000000000000000));
+	c    = _mm256_set_epi64x(-!(*cs&1), -!(*cs&2), -!(*cs&4), -!(*cs&8));
+
+	*cs>>= 4;
+	c    = _mm256_or_si256(_mm256_cmpgt_epi64(w,v),
+		_mm256_and_si256(_mm256_cmpeq_epi64(z,
+			_mm256_setzero_si256()), c));
+
+	c    = _mm256_xor_si256(c, _mm256_set1_epi64x(0xFFFFFFFFFFFFFFFF));
+
+	long long zs[4] = {Q, Q, Q, Q};
+	_mm256_maskstore_epi64(zs, c, z);
+
+	if(zs[0] < Q) {
+	    coeffs[i++] = CFLIP(zs[0],(int32_t)*cs);
+	    *cs >>= 1;
+	}
+	if(zs[1] < Q) {
+	    coeffs[i++] = CFLIP(zs[1],(int32_t)*cs);
+	    *cs >>= 1;
+	}
+	if(zs[2] < Q) {
+	    coeffs[i++] = CFLIP(zs[2],(int32_t)*cs);
+	    *cs >>= 1;
+	}
+	if(zs[3] < Q) {
+	    coeffs[i++] = CFLIP(zs[3],(int32_t)*cs);
+	    *cs >>= 1;
+	}
+	cs++;
+    }
+    for(int j=0; j<N; j++)
+	p1->coeffs[j] = coeffs[j];
+    for(int j=0; j<N; j++)
+	p2->coeffs[j] = coeffs[N+j];
+    //stop_time("sample_berncdt");
+}
